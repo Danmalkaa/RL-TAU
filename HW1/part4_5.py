@@ -1,7 +1,6 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
-import pylab
 
 
 def run_episode(env, weights):
