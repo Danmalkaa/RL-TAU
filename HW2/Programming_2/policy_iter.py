@@ -121,7 +121,8 @@ def policy_iteration(mdp, gamma, nIt):
         vals = [Vs[i][state] for i in range(nIt)]
         plt.plot(iters, vals, label=f"state {state}")
         plt.xticks(iters)
-        plt.legend()
+        plt.legend(loc='upper right',
+                   ncol=3, fancybox=True, shadow=True)
         plt.xlabel("Iteration")
         plt.ylabel("Value")
     return Vs, pis
