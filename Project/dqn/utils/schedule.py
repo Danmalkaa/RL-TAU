@@ -1,7 +1,7 @@
 """
     This file is copied/apdated from https://github.com/berkeleydeeprlcourse/homework/tree/master/hw3
 """
-class Schedule(object):
+class Schedule(object): # TODO: ASK - which scheduler? can replace?
     def value(self, t):
         """Value of the schedule at time t"""
         raise NotImplementedError()
