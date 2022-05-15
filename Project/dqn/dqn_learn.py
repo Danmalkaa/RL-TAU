@@ -123,7 +123,8 @@ def dqn_learing(
     # Initialize target q function and q function, i.e. build the model.
     ######
 
-    # YOUR CODE HERE
+    Q = q_func()
+    target_Q = q_func()
 
     ######
 
@@ -218,6 +219,32 @@ def dqn_learing(
             #####
 
             # YOUR CODE HERE
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            # get samples batch
+            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+            # calc Q values
+            Q_vals = Q(obs_batch).gather(1, index=act_batch.unsqueeze(1)).to(device)
+
+            # calc next Q values
+            Q_next = torch.zeros(batch_size, device=device)
+            Q_next[done_mask] = target_Q(next_obs_batch).max(1)[0].detach()
+
+            # calculate loss
+            expected_vals = torch.zeros(batch_size, device=device)
+            expected_vals[done_mask] = rew_batch + (gamma * Q_next)
+            loss_func = nn.L1Loss()
+            error = loss_func(expected_vals, Q_vals).clamp(-1, 1) * -1
+
+            # update model
+            optimizer.zero_grad()
+            Q_vals.backward(error.data.unsqueeze(1))
+            optimizer.step()
+
+            # update target model
+            if t % num_param_updates == 0:
+                target_Q.load_state_dict(Q.state_dict())
 
             #####
 
