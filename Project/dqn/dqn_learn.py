@@ -115,16 +115,25 @@ def dqn_learing(
         eps_threshold = exploration.value(t)
         if sample > eps_threshold:
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
-            # Use volatile = True if variable is only used in inference mode, i.e. don’t save the history
-            return model(Variable(obs, volatile=True)).data.max(1)[1].cpu()
+            # with torch.no_grad() variable is only used in inference mode, i.e. don’t save the history
+            with torch.no_grad():
+                return model(Variable(obs, volatile=True)).data.max(1)[1].cpu()
         else:
             return torch.IntTensor([[random.randrange(num_actions)]])
 
     # Initialize target q function and q function, i.e. build the model.
     ######
-
-    Q = q_func()
-    target_Q = q_func()
+    if torch.cuda.is_available():
+      print("running on CUDA")
+      device = torch.device("cuda")
+      Q = q_func(input_arg,num_actions).to(device)
+      target_Q = q_func(input_arg,num_actions).to(device)
+    else:
+      print("running on CPU")
+      device = torch.device("cpu")
+      Q = q_func(input_arg,num_actions)
+      target_Q = q_func(input_arg,num_actions)
+    criterion = nn.MSELoss(reduction='sum')
 
     ######
 
@@ -138,7 +147,7 @@ def dqn_learing(
     ###############
     # RUN ENV     #
     ###############
-    num_param_updates = 0
+    num_param_updates = 500
     mean_episode_reward = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
@@ -180,7 +189,15 @@ def dqn_learing(
         # might as well be random, since you haven't trained your net...)
         #####
 
-        # YOUR CODE HERE
+        last_obs_index= replay_buffer.store_frame(last_obs)
+        encoded_recent_obs = replay_buffer.encode_recent_observation()
+        chosen_action = select_epilson_greedy_action(Q,encoded_recent_obs, t)
+        obs, reward, is_done, details = env.step(chosen_action)
+        replay_buffer.store_effect(last_obs_index, chosen_action, reward, is_done)
+
+        if is_done:
+            obs = env.reset()
+        last_obs = obs
 
         #####
 
@@ -218,28 +235,31 @@ def dqn_learing(
             #      variable num_param_updates useful for this (it was initialized to 0)
             #####
 
-            # YOUR CODE HERE
 
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
             # get samples batch
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
             # calc Q values
-            Q_vals = Q(obs_batch).gather(1, index=act_batch.unsqueeze(1)).to(device)
+            obs_batch_tensor = torch.Tensor(obs_batch)
+            next_obs_batch_tensor = torch.Tensor(next_obs_batch)
+            rew_batch_tensor = torch.Tensor(rew_batch)
+            Q_vals = Q(obs_batch_tensor).gather(1, index=torch.Tensor(act_batch).type(torch.int64).unsqueeze(1)).to(device)
 
             # calc next Q values
             Q_next = torch.zeros(batch_size, device=device)
-            Q_next[done_mask] = target_Q(next_obs_batch).max(1)[0].detach()
+            Q_next[done_mask] = target_Q(next_obs_batch_tensor).max(1)[0].detach()
 
             # calculate loss
             expected_vals = torch.zeros(batch_size, device=device)
-            expected_vals[done_mask] = rew_batch + (gamma * Q_next)
+            expected_vals[done_mask] = rew_batch_tensor + (gamma * Q_next)
             loss_func = nn.L1Loss()
-            error = loss_func(expected_vals, Q_vals).clamp(-1, 1) * -1
+            error = loss_func(expected_vals.unsqueeze(-1), Q_vals).clamp(-1, 1) * -1
 
             # update model
             optimizer.zero_grad()
-            Q_vals.backward(error.data.unsqueeze(1))
+            # Q_vals.backward(error)
+            error.backward()
             optimizer.step()
 
             # update target model
@@ -247,7 +267,6 @@ def dqn_learing(
                 target_Q.load_state_dict(Q.state_dict())
 
             #####
-
         ### 4. Log progress and keep track of statistics
         episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
         if len(episode_rewards) > 0:

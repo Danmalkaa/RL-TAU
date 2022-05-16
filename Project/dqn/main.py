@@ -47,6 +47,12 @@ def main(env, num_timesteps):
     )
 
 if __name__ == '__main__':
+    """
+    Download ROMS 
+    run in terminal-
+    python -m atari_py.import_roms PATH_TO_ROMS
+    """
+
     # Get Atari games.
     benchmark = gym.benchmark_spec('Atari40M')
 
@@ -58,3 +64,4 @@ if __name__ == '__main__':
     env = get_env(task, seed)
 
     main(env, task.max_timesteps)
+
