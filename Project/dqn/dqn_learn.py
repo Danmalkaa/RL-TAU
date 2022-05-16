@@ -241,9 +241,9 @@ def dqn_learing(
             # get samples batch
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
             # calc Q values
-            obs_batch_tensor = torch.Tensor(obs_batch)
-            next_obs_batch_tensor = torch.Tensor(next_obs_batch)
-            rew_batch_tensor = torch.Tensor(rew_batch)
+            obs_batch_tensor = torch.Tensor(obs_batch).to(device)
+            next_obs_batch_tensor = torch.Tensor(next_obs_batch).to(device)
+            rew_batch_tensor = torch.Tensor(rew_batch).to(device)
             Q_vals = Q(obs_batch_tensor).gather(1, index=torch.Tensor(act_batch).type(torch.int64).unsqueeze(1)).to(device)
 
             # calc next Q values
