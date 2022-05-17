@@ -244,7 +244,7 @@ def dqn_learing(
             obs_batch_tensor = torch.Tensor(obs_batch).to(device)
             next_obs_batch_tensor = torch.Tensor(next_obs_batch).to(device)
             rew_batch_tensor = torch.Tensor(rew_batch).to(device)
-            Q_vals = Q(obs_batch_tensor).gather(1, index=torch.Tensor(act_batch).type(torch.int64).unsqueeze(1)).to(device)
+            Q_vals = Q(obs_batch_tensor).gather(1, index=torch.Tensor(act_batch).type(torch.int64).unsqueeze(1).to(device)).to(device)
 
             # calc next Q values
             Q_next = torch.zeros(batch_size, device=device)
