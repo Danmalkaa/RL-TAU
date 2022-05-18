@@ -261,12 +261,12 @@ def dqn_learing(
 
             # update model
             optimizer.zero_grad()
-            Q_vals.backward(error.data)
+            Q_vals.backward(error.data.unsqueeze(1))
             # error.backward()
             optimizer.step()
 
             # update target model
-            if t % num_param_updates == 0:
+            if t % target_update_freq == 0:
                 target_Q.load_state_dict(Q.state_dict())
 
             #####
