@@ -147,7 +147,7 @@ def dqn_learing(
     ###############
     # RUN ENV     #
     ###############
-    num_param_updates = 500
+    num_param_updates = 0
     mean_episode_reward = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
@@ -242,31 +242,35 @@ def dqn_learing(
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
             # calc Q values
             obs_batch_t = torch.from_numpy(obs_batch).float().to(device) / 255
-            next_obs_batch_t = torch.from_numpy(next_obs_batch).float().to(device) / 255
+            next_obs_batch_t = torch.from_numpy(next_obs_batch).float().to(device) /255
             rew_batch_t = torch.from_numpy(rew_batch).float().to(device)
             act_batch_t = torch.from_numpy(act_batch).long().unsqueeze(1).to(device)
+            not_done_mask = Variable(torch.from_numpy(1 - done_mask)).type(dtype)
 
             Q_vals = Q(obs_batch_t).gather(1, index=act_batch_t).to(device).squeeze()
 
             # calc next Q values
             Q_next = torch.zeros(batch_size, device=device)
-            Q_next[done_mask] = target_Q(next_obs_batch_t).max(1)[0].detach()
+            Q_next = target_Q(next_obs_batch_t).detach().max(1)[0]
+            next_Q_values = not_done_mask * Q_next
 
             # calculate loss
             expected_vals = torch.zeros(batch_size, device=device)
-            expected_vals = rew_batch_t + (gamma * Q_next)
-            loss_func = nn.SmoothL1Loss(reduction='none')
-            error = loss_func(expected_vals, Q_vals).clamp(-1, 1) * -1
+            expected_vals = rew_batch_t + (gamma * next_Q_values)
+            # loss_func = nn.SmoothL1Loss(reduction='none')
+            # error = loss_func(expected_vals, Q_vals).clamp(-1, 1) * -1
+            error = expected_vals-Q_vals
+            clip = error.clamp(-1, 1) * -1.0
 
 
             # update model
             optimizer.zero_grad()
-            Q_vals.backward(error.data)
-            # error.backward()
+            Q_vals.backward(clip.data) ## clip.data.unsqueeze(1)
             optimizer.step()
 
             # update target model
-            if t % target_update_freq == 0:
+            num_param_updates += 1
+            if num_param_updates % target_update_freq == 0:
                 target_Q.load_state_dict(Q.state_dict())
 
             #####
