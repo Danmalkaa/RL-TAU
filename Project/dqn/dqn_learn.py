@@ -241,25 +241,28 @@ def dqn_learing(
             # get samples batch
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
             # calc Q values
-            obs_batch_tensor = torch.Tensor(obs_batch).to(device)
-            next_obs_batch_tensor = torch.Tensor(next_obs_batch).to(device)
-            rew_batch_tensor = torch.Tensor(rew_batch).to(device)
-            Q_vals = Q(obs_batch_tensor).gather(1, index=torch.Tensor(act_batch).type(torch.int64).unsqueeze(1).to(device)).to(device)
+            obs_batch = torch.from_numpy(obs_batch).float().to(device) / 255
+            next_obs_batch = torch.from_numpy(next_obs_batch).float().to(device) / 255
+            rew_batch = torch.from_numpy(rew_batch).float().to(device)
+            act_batch = torch.from_numpy(act_batch).long().unsqueeze(1).to(device)
+
+            Q_vals = Q(obs_batch).gather(1, index=act_batch).to(device).squeeze()
 
             # calc next Q values
             Q_next = torch.zeros(batch_size, device=device)
-            Q_next[done_mask] = target_Q(next_obs_batch_tensor).max(1)[0].detach()
+            Q_next[done_mask] = target_Q(next_obs_batch).max(1)[0].detach()
 
             # calculate loss
             expected_vals = torch.zeros(batch_size, device=device)
-            expected_vals[done_mask] = rew_batch_tensor + (gamma * Q_next)
-            loss_func = nn.L1Loss()
-            error = loss_func(expected_vals.unsqueeze(-1), Q_vals).clamp(-1, 1) * -1
+            expected_vals[done_mask] = rew_batch + (gamma * Q_next)
+            loss_func = nn.L1Loss(reduction='none')
+            error = loss_func(expected_vals, Q_vals).clamp(-1, 1) * -1
+
 
             # update model
             optimizer.zero_grad()
-            # Q_vals.backward(error)
-            error.backward()
+            Q_vals.backward(error.data)
+            # error.backward()
             optimizer.step()
 
             # update target model
