@@ -8,6 +8,10 @@ from collections import namedtuple
 from itertools import count
 import random
 import gym.spaces
+import os
+import time
+import string
+import random
 
 import torch
 import torch.nn as nn
@@ -17,6 +21,10 @@ import torch.autograd as autograd
 from utils.replay_buffer import ReplayBuffer
 from utils.gym import get_wrapper_by_name
 
+STATS_SAVE_PATH = "/content/drive/MyDrive/RL homework/RL Project/project_stats"
+FILE_NAME ="stats_"+time.strftime("%Y%m%d-%H%M%S")+"_"+(''.join(random.choice(string.ascii_letters) for _ in range(5)))
+FULL_PATH  = STATS_SAVE_PATH+FILE_NAME+'.pkl'
+print("Saving file output to "+STATS_SAVE_PATH)
 USE_CUDA = torch.cuda.is_available()
 dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
@@ -293,6 +301,6 @@ def dqn_learing(
             sys.stdout.flush()
 
             # Dump statistics to pickle
-            with open('statistics.pkl', 'wb') as f:
+            with open(FULL_PATH, 'wb') as f:
                 pickle.dump(Statistic, f)
-                print("Saved to %s" % 'statistics.pkl')
+                print("Saved to %s" % FILE_NAME)
