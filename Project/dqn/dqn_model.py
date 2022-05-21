@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 class DQN(nn.Module):
     def __init__(self, in_channels=4, num_actions=18):
@@ -43,3 +44,22 @@ class DQN_RAM(nn.Module):
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
         return self.fc4(x)
+
+class D_Model(nn.Module):
+    def __init__(self, in_channels=4, num_actions=18):
+        """
+        Initialize a dynamic  network for guided exploration
+            in_features: number of features of input.
+            num_actions: number of action-value to output, one-to-one correspondence to action in game.
+        """
+        super(D_Model, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=7, stride=4, dilation=4) # TODO: ASK - change parameters?print(num_params)
+        # self.fc1 = nn.Linear(7200, 512)
+        # self.fc2 = nn.Linear(512, 7200)
+        self.fc3 = nn.Linear(7200, 84 * 84)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        # x = F.relu(self.fc1(x.view(x.size(0), -1)))
+        # x = F.relu(self.fc2(x))
+        return self.fc3(x.view(x.size(0), -1)).view((-1,84,84))

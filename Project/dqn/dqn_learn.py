@@ -12,6 +12,8 @@ import os
 import time
 import string
 import random
+from scipy import stats
+
 
 import torch
 import torch.nn as nn
@@ -58,7 +60,8 @@ def dqn_learing(
     learning_starts=50000,
     learning_freq=4,
     frame_history_len=4,
-    target_update_freq=10000
+    target_update_freq=10000,
+    dynamic_exp_model=None
     ):
 
     """Run Deep Q-learning algorithm.
@@ -129,6 +132,63 @@ def dqn_learing(
         else:
             return torch.IntTensor([[random.randrange(num_actions)]])
 
+    def select_guided_explore_action(model, obs, t, explore_kwargs):
+        sample = random.random()
+        eps_threshold = exploration.value(t)
+        if sample > eps_threshold:
+            obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
+            # with torch.no_grad() variable is only used in inference mode, i.e. don’t save the history
+            with torch.no_grad():
+                return model(Variable(obs, volatile=True)).data.max(1)[1].cpu()
+        else:
+            return explore(**explore_kwargs)
+
+    def get_probability(state, samples):
+        design = []
+        for s in samples:
+            design.append(s[0])
+        design = np.stack(design)
+        design = np.array(design).reshape(50, -1)
+        cov = np.cov(design)
+        mean = np.mean(design,axis = 1)
+        try:
+            p = stats.multivariate_normal.pdf(state[0].detach().numpy(),mean,cov)
+        except:
+            p = 1.0
+        return p
+
+    def explore(d_model, state, replay_memory, num_actions):
+        N = replay_buffer_size
+        num_samples = 50
+        samples = []
+        for i in range(N-num_samples,N):
+           samples.append(replay_memory.obs[i])
+
+        least_p = np.inf
+        best_a = -1
+        d_model.eval()
+        for action in range(num_actions):
+            # next_state = d_model(np.append(state, [[[action]]], axis=1))
+            next_state = d_model(torch.from_numpy(state).unsqueeze(0).float())
+
+            p = get_probability(next_state, samples)
+            if p < least_p:
+                best_a = action
+                least_p = p
+        d_model.train()
+        return best_a
+
+
+    def fit_dynamics_model(model,optim,loss,samples):
+        obs_batch_t, _, _, next_obs_batch_t, _ = samples
+        batched_inputs = obs_batch_t
+        batched_targets = next_obs_batch_t[:,0,:,:]
+        batched_output = model(batched_inputs)
+        batch_loss = loss(batched_targets,batched_output)
+        optim.zero_grad()
+        batch_loss.backward()
+        optim.step()
+
     # Initialize target q function and q function, i.e. build the model.
     ######
     if torch.cuda.is_available():
@@ -136,13 +196,20 @@ def dqn_learing(
       device = torch.device("cuda")
       Q = q_func(input_arg,num_actions).to(device)
       target_Q = q_func(input_arg,num_actions).to(device)
+      if dynamic_exp_model is not None:
+          D_exp_model = dynamic_exp_model(input_arg,num_actions).to(device)
     else:
       print("running on CPU")
       device = torch.device("cpu")
       Q = q_func(input_arg,num_actions)
       target_Q = q_func(input_arg,num_actions)
-    criterion = nn.MSELoss(reduction='sum')
-
+      if dynamic_exp_model is not None:
+          D_exp_model = dynamic_exp_model(input_arg,num_actions)
+    D_criterion = nn.MSELoss(reduction='sum')
+    D_opt_spec = OptimizerSpec(
+        constructor=torch.optim.Adam,
+        kwargs=dict(lr=0.02))
+    D_opt = D_opt_spec.constructor(D_exp_model.parameters(), **D_opt_spec.kwargs)
     ######
 
 
@@ -199,7 +266,9 @@ def dqn_learing(
 
         last_obs_index= replay_buffer.store_frame(last_obs)
         encoded_recent_obs = replay_buffer.encode_recent_observation()
-        chosen_action = select_epilson_greedy_action(Q,encoded_recent_obs, t)
+        # chosen_action = select_epilson_greedy_action(Q,encoded_recent_obs, t)
+        explore_kwargs_dict = dict(d_model=D_exp_model, state=encoded_recent_obs, replay_memory=replay_buffer, num_actions=num_actions)
+        chosen_action = select_guided_explore_action(Q,encoded_recent_obs, t, explore_kwargs_dict)
         obs, reward, is_done, details = env.step(chosen_action)
         replay_buffer.store_effect(last_obs_index, chosen_action, reward, is_done)
 
@@ -248,12 +317,18 @@ def dqn_learing(
 
             # get samples batch
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+
+
             # calc Q values
             obs_batch_t = torch.from_numpy(obs_batch).float().to(device) / 255
             next_obs_batch_t = torch.from_numpy(next_obs_batch).float().to(device) /255
             rew_batch_t = torch.from_numpy(rew_batch).float().to(device)
             act_batch_t = torch.from_numpy(act_batch).long().unsqueeze(1).to(device)
             not_done_mask = Variable(torch.from_numpy(1 - done_mask)).type(dtype)
+
+            if num_param_updates % 25 == 0: # TODO: change
+                samples = (obs_batch_t, act_batch_t, rew_batch_t, next_obs_batch_t, done_mask)
+                fit_dynamics_model(D_exp_model,D_opt,D_criterion,samples)
 
             Q_vals = Q(obs_batch_t).gather(1, index=act_batch_t).to(device).squeeze()
 
