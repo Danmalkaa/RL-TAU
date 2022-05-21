@@ -169,7 +169,7 @@ def dqn_learing(
         d_model.eval()
         for action in range(num_actions):
             # next_state = d_model(np.append(state, [[[action]]], axis=1))
-            next_state = d_model(torch.from_numpy(state).unsqueeze(0).float())
+            next_state = d_model(torch.from_numpy(state).unsqueeze(0).float().to(device))
 
             p = get_probability(next_state, samples)
             if p < least_p:
