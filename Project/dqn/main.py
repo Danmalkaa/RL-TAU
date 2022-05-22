@@ -9,13 +9,15 @@ from utils.schedule import LinearSchedule
 BATCH_SIZE = 32
 GAMMA = 0.99
 REPLAY_BUFFER_SIZE = 1000000
-LEARNING_STARTS = 50000 # Todo: CHagne back
+LEARNING_STARTS = 1000 # Todo: CHagne back
 LEARNING_FREQ = 4
 FRAME_HISTORY_LEN = 4
 TARGER_UPDATE_FREQ = 10000
 LEARNING_RATE = 0.00025
 ALPHA = 0.95
 EPS = 0.01
+DYN_EXPERIMENT = False
+
 
 def main(env, num_timesteps):
 
@@ -31,21 +33,38 @@ def main(env, num_timesteps):
 
     exploration_schedule = LinearSchedule(1000000, 0.1)
 
-    dqn_learing(
-        env=env,
-        q_func=DQN,
-        optimizer_spec=optimizer_spec,
-        exploration=exploration_schedule,
-        stopping_criterion=stopping_criterion,
-        replay_buffer_size=REPLAY_BUFFER_SIZE,
-        batch_size=BATCH_SIZE,
-        gamma=GAMMA,
-        learning_starts=LEARNING_STARTS,
-        learning_freq=LEARNING_FREQ,
-        frame_history_len=FRAME_HISTORY_LEN,
-        target_update_freq=TARGER_UPDATE_FREQ,
-        dynamic_exp_model=D_Model
-    )
+    if DYN_EXPERIMENT:
+        dqn_learing(
+            env=env,
+            q_func=DQN,
+            optimizer_spec=optimizer_spec,
+            exploration=exploration_schedule,
+            stopping_criterion=stopping_criterion,
+            replay_buffer_size=REPLAY_BUFFER_SIZE,
+            batch_size=BATCH_SIZE,
+            gamma=GAMMA,
+            learning_starts=LEARNING_STARTS,
+            learning_freq=LEARNING_FREQ,
+            frame_history_len=FRAME_HISTORY_LEN,
+            target_update_freq=TARGER_UPDATE_FREQ,
+            dynamic_exp_model=D_Model
+        )
+    else:
+        dqn_learing(
+            env=env,
+            q_func=DQN,
+            optimizer_spec=optimizer_spec,
+            exploration=exploration_schedule,
+            stopping_criterion=stopping_criterion,
+            replay_buffer_size=REPLAY_BUFFER_SIZE,
+            batch_size=BATCH_SIZE,
+            gamma=GAMMA,
+            learning_starts=LEARNING_STARTS,
+            learning_freq=LEARNING_FREQ,
+            frame_history_len=FRAME_HISTORY_LEN,
+            target_update_freq=TARGER_UPDATE_FREQ,
+            )
+
 
 if __name__ == '__main__':
     """
@@ -65,4 +84,5 @@ if __name__ == '__main__':
     env = get_env(task, seed)
 
     main(env, task.max_timesteps)
+
 

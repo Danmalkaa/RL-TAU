@@ -205,11 +205,12 @@ def dqn_learing(
       target_Q = q_func(input_arg,num_actions)
       if dynamic_exp_model is not None:
           D_exp_model = dynamic_exp_model(input_arg,num_actions)
-    D_criterion = nn.MSELoss(reduction='sum')
-    D_opt_spec = OptimizerSpec(
-        constructor=torch.optim.Adam,
-        kwargs=dict(lr=0.02))
-    D_opt = D_opt_spec.constructor(D_exp_model.parameters(), **D_opt_spec.kwargs)
+    if dynamic_exp_model is not None:
+        D_criterion = nn.MSELoss(reduction='sum')
+        D_opt_spec = OptimizerSpec(
+            constructor=torch.optim.Adam,
+            kwargs=dict(lr=0.02))
+        D_opt = D_opt_spec.constructor(D_exp_model.parameters(), **D_opt_spec.kwargs)
     ######
 
 
@@ -227,6 +228,7 @@ def dqn_learing(
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
     LOG_EVERY_N_STEPS = 10000
+    learn_start = False
 
     for t in count():
         ### 1. Check stopping criterion
@@ -266,9 +268,11 @@ def dqn_learing(
 
         last_obs_index= replay_buffer.store_frame(last_obs)
         encoded_recent_obs = replay_buffer.encode_recent_observation()
-        # chosen_action = select_epilson_greedy_action(Q,encoded_recent_obs, t)
-        explore_kwargs_dict = dict(d_model=D_exp_model, state=encoded_recent_obs, replay_memory=replay_buffer, num_actions=num_actions)
-        chosen_action = select_guided_explore_action(Q,encoded_recent_obs, t, explore_kwargs_dict)
+        if dynamic_exp_model is not None:
+            explore_kwargs_dict = dict(d_model=D_exp_model, state=encoded_recent_obs, replay_memory=replay_buffer, num_actions=num_actions)
+            chosen_action = select_guided_explore_action(Q,encoded_recent_obs, t, explore_kwargs_dict) if learn_start else select_epilson_greedy_action(Q,encoded_recent_obs, t)
+        else:
+            chosen_action = select_epilson_greedy_action(Q, encoded_recent_obs, t)
         obs, reward, is_done, details = env.step(chosen_action)
         replay_buffer.store_effect(last_obs_index, chosen_action, reward, is_done)
 
@@ -312,7 +316,7 @@ def dqn_learing(
             #      variable num_param_updates useful for this (it was initialized to 0)
             #####
 
-
+            learn_start = True
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
             # get samples batch
@@ -326,7 +330,7 @@ def dqn_learing(
             act_batch_t = torch.from_numpy(act_batch).long().unsqueeze(1).to(device)
             not_done_mask = Variable(torch.from_numpy(1 - done_mask)).type(dtype)
 
-            if num_param_updates % 25 == 0: # TODO: change
+            if num_param_updates % 100 == 0 and dynamic_exp_model is not None: # TODO: change
                 samples = (obs_batch_t, act_batch_t, rew_batch_t, next_obs_batch_t, done_mask)
                 fit_dynamics_model(D_exp_model,D_opt,D_criterion,samples)
 
