@@ -20,7 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
 
-from utils.replay_buffer import ReplayBuffer
+from utils.replay_buffer import ReplayBuffer, sample_n_unique
 from utils.gym import get_wrapper_by_name
 
 STATS_SAVE_PATH = "/content/drive/MyDrive/RL homework/RL Project/project_stats/"
@@ -135,43 +135,47 @@ def dqn_learing(
     def select_guided_explore_action(model, obs, t, explore_kwargs):
         sample = random.random()
         eps_threshold = exploration.value(t)
+        eps_threshold = max(0.05, eps_threshold - 0.5)
         if sample > eps_threshold:
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
             # with torch.no_grad() variable is only used in inference mode, i.e. don’t save the history
             with torch.no_grad():
                 return model(Variable(obs, volatile=True)).data.max(1)[1].cpu()
         else:
-            return explore(**explore_kwargs)
+            with torch.no_grad():
+                return explore(**explore_kwargs)
 
     def get_probability(state, samples):
-        design = []
-        for s in samples:
-            design.append(s[0])
-        design = np.stack(design)
-        design = np.array(design).reshape(50, -1)
-        cov = np.cov(design)
-        mean = np.mean(design,axis = 1)
+        design = samples
+        cov = design.cov()
+        mean = design.mean(dim=1)
         try:
-            p = stats.multivariate_normal.pdf(state[0].detach().numpy(),mean,cov)
+            p = stats.multivariate_normal.pdf(state.detach().numpy(), mean.detach().numpy(), cov.detach().numpy())
         except:
             p = 1.0
         return p
 
     def explore(d_model, state, replay_memory, num_actions):
+        d_model.eval()
         N = replay_buffer_size
         num_samples = 50
         samples = []
-        for i in range(N-num_samples,N):
-           samples.append(replay_memory.obs[i])
+        # idxes = sample_n_unique(lambda: range(N-num_samples,N), num_samples)
+        _, act_batch, _, _, _ = replay_memory._encode_sample(list(range(N-num_samples-1,N-1)))
+        act_batch_t = torch.from_numpy(act_batch).float().unsqueeze(1).to(device)
+        for i in range(N-num_samples-2,N-2):
+            outputs = d_model(torch.from_numpy(replay_memory._encode_observation((i - 1) % replay_memory.size)).unsqueeze(0).float().to(device) / 255.0)
+            samples.append(outputs)
+        samples = torch.stack(samples).squeeze()
+        samples = torch.concat((samples,act_batch_t),dim=1)
 
         least_p = np.inf
         best_a = -1
-        d_model.eval()
+        next_state = d_model(torch.from_numpy(state).unsqueeze(0).float().to(device))
         for action in range(num_actions):
             # next_state = d_model(np.append(state, [[[action]]], axis=1))
-            next_state = d_model(torch.from_numpy(state).unsqueeze(0).float().to(device))
-
-            p = get_probability(next_state, samples)
+            tmp_next_state = torch.concat((next_state,torch.Tensor([float(action)]).unsqueeze(0).to(device)),dim=1)
+            p = get_probability(tmp_next_state, samples)
             if p < least_p:
                 best_a = action
                 least_p = p
@@ -180,10 +184,13 @@ def dqn_learing(
 
 
     def fit_dynamics_model(model,optim,loss,samples):
-        obs_batch_t, _, _, next_obs_batch_t, _ = samples
+        obs_batch_t, act_batch_t, _, next_obs_batch_t, _ = samples
         batched_inputs = obs_batch_t
-        batched_targets = next_obs_batch_t[:,0,:,:]
         batched_output = model(batched_inputs)
+        batched_output = torch.concat((batched_output,act_batch_t),dim=1)
+        with torch.no_grad():
+            batched_targets = model(next_obs_batch_t)
+            batched_targets = torch.concat((batched_targets,act_batch_t),dim=1)
         batch_loss = loss(batched_targets,batched_output)
         optim.zero_grad()
         batch_loss.backward()
@@ -209,7 +216,7 @@ def dqn_learing(
         D_criterion = nn.MSELoss(reduction='sum')
         D_opt_spec = OptimizerSpec(
             constructor=torch.optim.Adam,
-            kwargs=dict(lr=0.02))
+            kwargs=dict(lr=0.1))
         D_opt = D_opt_spec.constructor(D_exp_model.parameters(), **D_opt_spec.kwargs)
     ######
 
@@ -267,10 +274,10 @@ def dqn_learing(
         #####
 
         last_obs_index= replay_buffer.store_frame(last_obs)
-        encoded_recent_obs = replay_buffer.encode_recent_observation()
+        encoded_recent_obs = replay_buffer.encode_recent_observation() /255.0
         if dynamic_exp_model is not None:
             explore_kwargs_dict = dict(d_model=D_exp_model, state=encoded_recent_obs, replay_memory=replay_buffer, num_actions=num_actions)
-            chosen_action = select_guided_explore_action(Q,encoded_recent_obs, t, explore_kwargs_dict) if learn_start else select_epilson_greedy_action(Q,encoded_recent_obs, t)
+            chosen_action = select_guided_explore_action(Q,encoded_recent_obs, t, explore_kwargs_dict) if learn_start else select_epilson_greedy_action(Q,encoded_recent_obs, 0)
         else:
             chosen_action = select_epilson_greedy_action(Q, encoded_recent_obs, t)
         obs, reward, is_done, details = env.step(chosen_action)
@@ -330,7 +337,8 @@ def dqn_learing(
             act_batch_t = torch.from_numpy(act_batch).long().unsqueeze(1).to(device)
             not_done_mask = Variable(torch.from_numpy(1 - done_mask)).type(dtype)
 
-            if num_param_updates % 100 == 0 and dynamic_exp_model is not None: # TODO: change
+            # Train Dynamic Network
+            if num_param_updates % 100 == 0 and dynamic_exp_model is not None:
                 samples = (obs_batch_t, act_batch_t, rew_batch_t, next_obs_batch_t, done_mask)
                 fit_dynamics_model(D_exp_model,D_opt,D_criterion,samples)
 
