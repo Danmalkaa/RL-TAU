@@ -52,7 +52,7 @@ def main(env, num_timesteps):
     else:
         dqn_learing(
             env=env,
-            q_func=DQN,
+            q_func=D_Model,
             optimizer_spec=optimizer_spec,
             exploration=exploration_schedule,
             stopping_criterion=stopping_criterion,
