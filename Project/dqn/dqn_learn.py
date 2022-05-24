@@ -135,7 +135,7 @@ def dqn_learing(
     def select_guided_explore_action(model, obs, t, explore_kwargs):
         sample = random.random()
         eps_threshold = exploration.value(t)
-        eps_threshold = max(0.05, eps_threshold - 0.5)
+        eps_threshold = max(0.05, eps_threshold)
         if sample > eps_threshold:
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
             # with torch.no_grad() variable is only used in inference mode, i.e. don’t save the history
