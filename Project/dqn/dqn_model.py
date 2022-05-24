@@ -18,14 +18,13 @@ class DQN(nn.Module):
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
         self.fc4 = nn.Linear(7 * 7 * 64, 512)
         self.fc5 = nn.Linear(512, num_actions)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.bn2 = nn.BatchNorm2d(64)
+
 
 
 
     def forward(self, x):
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu((self.conv1(x))
+        x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
         x = F.relu(self.fc4(x.view(x.size(0), -1)))
         return self.fc5(x)
