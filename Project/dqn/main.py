@@ -7,16 +7,16 @@ from utils.gym import get_env, get_wrapper_by_name
 from utils.schedule import LinearSchedule
 
 BATCH_SIZE = 32
-GAMMA = 0.99
+GAMMA = 0.999
 REPLAY_BUFFER_SIZE = 1000000
 LEARNING_STARTS = 50000 # Todo: CHagne back
-LEARNING_FREQ = 8
-FRAME_HISTORY_LEN = 8
+LEARNING_FREQ = 4
+FRAME_HISTORY_LEN = 4
 TARGER_UPDATE_FREQ = 10000
 LEARNING_RATE = 0.00025
 ALPHA = 0.95
 EPS = 0.01
-DYN_EXPERIMENT = True
+DYN_EXPERIMENT = False
 
 
 def main(env, num_timesteps):
