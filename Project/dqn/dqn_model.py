@@ -67,12 +67,10 @@ class D_Model(nn.Module):
         # Input 20x20x96
         self.conv3 = nn.Conv2d(int(self.ndf*1.5), self.ndf*2, kernel_size=3, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.ndf*2)
-        self.drop_3 = nn.Dropout2d(0.4)
 
         # Input 10x10x128
         self.conv4 = nn.Conv2d(self.ndf*2, self.ndf*4, kernel_size=3, padding=1, bias=False)
         self.bn4 = nn.BatchNorm2d(self.ndf*4)
-        self.drop_4 = nn.Dropout2d(0.5)
 
         # Input 5x5x256
         self.fc1 = nn.Linear(self.ndf*4*5*5, self.emb_size, bias=True)
@@ -85,10 +83,8 @@ class D_Model(nn.Module):
         x = F.leaky_relu(e2, 0.2, inplace=True)
         e3 = F.max_pool2d(self.bn3(self.conv3(x)), 2)
         x = F.leaky_relu(e3, 0.2, inplace=True)
-        x = self.drop_3(x)
         e4 = F.max_pool2d(self.bn4(self.conv4(x)), 2)
         x = F.leaky_relu(e4, 0.2, inplace=True)
-        x = self.drop_4(x)
         x = x.view(-1, self.ndf*4*5*5)
         output = self.fc1(x)
 
