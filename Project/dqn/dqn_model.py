@@ -54,7 +54,7 @@ class D_Model(nn.Module):
 
     def __init__(self, in_channels=4, num_actions=64):
         super(D_Model, self).__init__()
-        self.emb_size = num_actions
+        self.emb_size = 64
         self.ndf = 64
 
         # Input 84x84x4
