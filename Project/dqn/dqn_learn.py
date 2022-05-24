@@ -23,7 +23,7 @@ import torch.autograd as autograd
 from utils.replay_buffer import ReplayBuffer, sample_n_unique
 from utils.gym import get_wrapper_by_name
 
-STATS_SAVE_PATH = "/content/drive/MyDrive/RL homework/RL Project/project_stats/"
+STATS_SAVE_PATH = "/kaggle/working/RL_EXP/Project"
 FILE_NAME ="stats_"+time.strftime("%Y%m%d-%H%M%S")+"_"+(''.join(random.choice(string.ascii_letters) for _ in range(5)))
 FULL_PATH  = STATS_SAVE_PATH+FILE_NAME+'.pkl'
 print("Saving file output to "+STATS_SAVE_PATH)
