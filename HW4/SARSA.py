@@ -117,7 +117,7 @@ THRESHOLD = 0.94
 best_alpha, best_gamma, best_prob , best_thresh= 0.0,0.0,0.0,0.0
 best_prob_arr = None
 mean,mean_ada = [],[]
-for thr in np.linspace(0,0.99, 5):
+for thr in np.linspace(0.1,0.99, 5):
     for a in np.linspace(0.01,0.99,5):
         for g in np.linspace(0.01, 0.99, 5):
             for i in range(2):
