@@ -6,8 +6,8 @@ def run_exp(episodes = int(1e4), alpha_par = None, gamma_par = None):
     actions = [0, 1]
 
     def reset():
-        Q = np.zeros((22, 11)) # state-action value
-        NSA = np.zeros((22, 11, len(actions))) # state-action counter
+        Q = np.zeros((23, 12)) # state-action value
+        NSA = np.zeros((23, 12, len(actions))) # state-action counter
         wins = 0
 
         return Q, NSA, wins
@@ -44,12 +44,11 @@ def run_exp(episodes = int(1e4), alpha_par = None, gamma_par = None):
             env.init_deck()
 
             terminated = False
-            E = np.zeros((22, 11, len(actions))) # Eligibility Trace
             p, d = env.initGame()
 
             SA = list()
-            # first action is draw anyway - starts with 1 card in hand
-            a = 0
+            # # first action is draw anyway - starts with 1 card in hand
+            a = player_td0(p, d)
 
             # Sample Environment
             while not terminated:
@@ -63,13 +62,11 @@ def run_exp(episodes = int(1e4), alpha_par = None, gamma_par = None):
                 else:
                     tdError = r - V[p, d]
 
-                E[p, d, a] += 1
                 NSA[p, d, a] += 1
                 SA.append([p, d, a])
 
                 for (_p, _d, _a) in SA:
                     V[_p, _d] += alpha(_p, _d, _a) * tdError
-                    E[_p, _d, _a] *= lmd
 
                 if not terminated:
                     p, d, a = pPrime, dPrime, aPrime
@@ -82,24 +79,30 @@ def run_exp(episodes = int(1e4), alpha_par = None, gamma_par = None):
 
 GAMMA = 0.65
 ALPHA = 0.78
-episodes = 10000
+episodes = 100000
 best_alpha, best_gamma, best_prob = 0.0,0.0,0.0
 mean,mean_ada = [],[]
-for a in np.linspace(0.01,0.99, 20):
-    for g in np.linspace(0.01,0.99,20):
-        for i in range(2):
-            wins = run_exp(episodes) # run with adaptive alpha gamma
-            # print(f"TD(0) Probability for win is {float(wins)/episodes:.4f} Adaptive Gamma and Alpha")
 
-            wins_const = run_exp(episodes, a,g) # run with set gamma and alpha
-            # print(f"TD(0) Probability for win is {float(wins)/episodes:.4f} Gamma = {GAMMA} and Alpha = {ALPHA}")
+wins = run_exp(episodes) # run with adaptive alpha gamma
+print(f"TD(0) Win Probability is {float(wins)/episodes:.4f} Over {episodes} runs")
 
-            if float(wins)/episodes > best_prob:
-                best_prob = float(wins)/episodes
+# for a in np.linspace(0.01,0.99, 1):
+#     for g in np.linspace(0.01,0.99,1):
+#         for i in range(5):
+#             wins = run_exp(episodes) # run with adaptive alpha gamma
+#             # print(f"TD(0) Probability for win is {float(wins)/episodes:.4f} Adaptive Gamma and Alpha")
+#
+#             # wins_const = run_exp(episodes, a,g) # run with set gamma and alpha
+#             # print(f"TD(0) Probability for win is {float(wins)/episodes:.4f} Gamma = {GAMMA} and Alpha = {ALPHA}")
+#
+#             if float(wins)/episodes > best_prob:
+#                 best_prob = float(wins)/episodes
+#
+#             # mean.append(float(wins_const)/episodes)
+#             mean_ada.append(float(wins)/episodes)
 
-            mean.append(float(wins_const)/episodes)
-            mean_ada.append(float(wins)/episodes)
+
+# print(f"TD(0) Probability const Average is {np.mean(mean):.4f}, adaptive is {np.mean(mean_ada):.4f}")
 
 
-print(f"TD(0) Probability const Average is {np.mean(mean):.4f}, adaptive is {np.mean(mean_ada):.4f}")
 

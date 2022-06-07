@@ -4,7 +4,7 @@ import random
 class Easy21():
 
     def __init__(self):
-        self.minCardValue, self.maxCardValue = 1, 10
+        self.minCardValue, self.maxCardValue = 2, 11
         self.dealerUpperBound = 16
         self.gameLowerBound, self.gameUpperBound = 0, 21
         self.init_deck()
@@ -19,7 +19,11 @@ class Easy21():
         # self.deck = random.shuffle(self.deck)
 
     def initGame(self):
-        return (np.random.randint(self.minCardValue, self.maxCardValue + 1),
+        player = np.random.randint(self.minCardValue, self.maxCardValue + 1) + np.random.randint(self.minCardValue, self.maxCardValue + 1) # two cards for gambler
+        while player == 22: # init again for case A+A (in our case is 22 - invalid)
+            player = np.random.randint(self.minCardValue, self.maxCardValue + 1) + np.random.randint(self.minCardValue,
+                                                                                                     self.maxCardValue + 1)  # two cards for gambler
+        return (player,
                 np.random.randint(self.minCardValue, self.maxCardValue + 1))
 
     def draw(self):
